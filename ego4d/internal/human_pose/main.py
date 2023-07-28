@@ -30,8 +30,8 @@ from ego4d.internal.human_pose.dataset import (
     SyncedEgoExoCaptureDset,
 )
 from ego4d.internal.human_pose.pose_estimator import PoseModel
-from ego4d.internal.human_pose.pose_refiner import get_refined_pose3d
-from ego4d.internal.human_pose.postprocess_pose3d import detect_outliers_and_interpolate
+# from ego4d.internal.human_pose.pose_refiner import get_refined_pose3d
+# from ego4d.internal.human_pose.postprocess_pose3d import detect_outliers_and_interpolate
 from ego4d.internal.human_pose.readers import read_frame_idx_set
 from ego4d.internal.human_pose.triangulator import Triangulator
 from ego4d.internal.human_pose.utils import (
@@ -889,7 +889,9 @@ def mode_body_pose2d(config: Config):
     )
     # Load body keypoints estimation model
     pose_model = PoseModel(
-        pose_config=ctx.pose_config, pose_checkpoint=ctx.pose_checkpoint
+        pose_config=ctx.pose_config, 
+        pose_checkpoint=ctx.pose_checkpoint,
+        rgb_keypoint_vis_thres=0.3
     )
 
     # Create directory to store body pose2d results and visualization
@@ -920,34 +922,28 @@ def mode_body_pose2d(config: Config):
         # Iterate through every cameras
         for exo_camera_name in ctx.exo_cam_names:
             image_path = info[f"{exo_camera_name}_0"]["abs_frame_path"]
-            image = cv2.imread(image_path)
-
+            
             # Directory to store body kpts visualization for current camera
             if visualization:
                 vis_pose2d_cam_dir = os.path.join(vis_pose2d_dir, exo_camera_name)
                 if not os.path.exists(vis_pose2d_cam_dir):
                     os.makedirs(vis_pose2d_cam_dir)
-
-            # Load in body bbox
-            bbox_xyxy = bboxes[time_stamp][exo_camera_name]  # x1, y1, x2, y2
+            
+            # Load in body bbox 
+            bbox_xyxy = bboxes[time_stamp][exo_camera_name][None,:]  # (1,4)
             if bbox_xyxy is not None:
-                # add confidence score to the bbox
-                bbox_xyxy = np.append(bbox_xyxy, 1.0)
-
                 # Inference to get body 2d kpts
-                pose_results = pose_model.get_poses2d(
-                    bboxes=[{"bbox": bbox_xyxy}],
+                body_pose2d_result, body_data_samples = pose_model.get_poses2d(
+                    bboxes=bbox_xyxy,
                     image_name=image_path,
                 )
-                assert len(pose_results) == 1
                 # Save results and visualization
                 if visualization:
-                    save_path = os.path.join(
-                        vis_pose2d_cam_dir, f"{time_stamp:05d}.jpg"
-                    )
-                    pose_model.draw_poses2d(pose_results, image, save_path)
-                pose_result = pose_results[0]
-                pose2d = pose_result["keypoints"]
+                    image = cv2.imread(image_path)
+                    save_path = os.path.join(vis_pose2d_cam_dir, f"{time_stamp:05d}.jpg")
+                    pose_model.draw_poses2d(body_data_samples, image, save_path)
+                # Append pose2d result
+                pose2d = body_pose2d_result
             else:
                 pose2d = None
                 if visualization:
@@ -2348,20 +2344,20 @@ def new_run(config: Config):
 
 
 def add_arguments(parser):
-    parser.add_argument("--config-name", default="georgiatech_covid_02_2")
+    parser.add_argument("--config-name", default="iiith_cooking_01_1")
     parser.add_argument(
         "--config_path", default="configs", help="Path to the config folder"
     )
     parser.add_argument(
         "--take_name",
-        default="georgiatech_covid_02_2",
+        default="iiith_cooking_01_1",
         type=str,
         help="take names to run, concatenated by '+', "
         + "e.g., uniandes_dance_007_3+iiith_cooking_23+nus_covidtest_01",
     )
     parser.add_argument(
         "--steps",
-        default="hand_pose3d_egoexo",
+        default="preprocess",
         type=str,
         help="steps to run concatenated by '+', e.g., preprocess+bbox+pose2d+pose3d",
     )
@@ -2405,7 +2401,7 @@ def get_hydra_config(args):
     cfg = hydra.compose(
         config_name=args.config_name,
         # args.opts contains config overrides, e.g., ["inputs.from_frame_number=7000",]
-        overrides=args.opts + [f"inputs.take_name={args.take_name}"],
+        # overrides=args.opts + [f"inputs.take_name={args.take_name}"],
     )
     print("Final config:", cfg)
     return cfg
@@ -2458,6 +2454,7 @@ if __name__ == "__main__":
         new_run()
     else:
         run()
+
     # # Not using hydra:
     # args = parse_args()
     # main(args)

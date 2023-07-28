@@ -1,23 +1,8 @@
 import os
-
 import cv2
 import numpy as np
 from mmdet.apis import inference_detector, init_detector
 
-from mmpose.apis import (
-    inference_top_down_pose_model,
-    init_pose_model,
-    process_mmdet_results,
-    vis_pose_result,
-)
-from mmpose.core.bbox.transforms import (
-    bbox_cs2xywh,
-    bbox_xywh2cs,
-    bbox_xywh2xyxy,
-    bbox_xyxy2xywh,
-)
-from mmpose.datasets import DatasetInfo
-from tqdm import tqdm
 
 ##------------------------------------------------------------------------------------
 class DetectorModel:
@@ -33,17 +18,18 @@ class DetectorModel:
 
     ## iou_threshold: the threshold to decide whether to use the offshelf bbox or not
     def get_bboxes(self, image_name, bboxes, iou_threshold=0.3):
+        refined_bboxes = bboxes.copy()
+
+        # Inference with pretrained detector
         det_results = inference_detector(self.detector, image_name)
-        person_results = process_mmdet_results(
-            det_results, 1
-        )  # keep the person class bounding boxes.
-        person_results = [
-            bbox for bbox in person_results if bbox["bbox"][4] > self.min_bbox_score
-        ]
+        
+        # Reformat the bbox result
+        body_pred_instance = det_results.pred_instances.cpu().numpy()
+        body_bboxes = np.concatenate((body_pred_instance.bboxes, body_pred_instance.scores[:, None]), axis=1)
+        person_results = [{'bbox':curr_bbox} for curr_bbox in body_bboxes if curr_bbox[4] > self.min_bbox_score]
 
         refined_bboxes = bboxes.copy()
         is_offshelf_valid = [True] * len(person_results)
-
         ## go through over the aria bboxes
         for i, bbox in enumerate(refined_bboxes):
             max_iou = 0
