@@ -933,7 +933,7 @@ def mode_body_pose2d(config: Config):
             bbox_xyxy = bboxes[time_stamp][exo_camera_name][None,:]  # (1,4)
             if bbox_xyxy is not None:
                 # Inference to get body 2d kpts
-                body_pose2d_result, body_data_samples = pose_model.get_poses2d(
+                body_pose2d_result = pose_model.get_poses2d(
                     bboxes=bbox_xyxy,
                     image_name=image_path,
                 )
@@ -941,9 +941,9 @@ def mode_body_pose2d(config: Config):
                 if visualization:
                     image = cv2.imread(image_path)
                     save_path = os.path.join(vis_pose2d_cam_dir, f"{time_stamp:05d}.jpg")
-                    pose_model.draw_poses2d(body_data_samples, image, save_path)
+                    pose_model.draw_poses2d(body_pose2d_result, image, save_path)
                 # Append pose2d result
-                pose2d = body_pose2d_result
+                pose2d = body_pose2d_result[0] # (1,N,3) -> (N,3)
             else:
                 pose2d = None
                 if visualization:
@@ -977,7 +977,9 @@ def mode_body_pose3d(config: Config):
     )
     # Load body keypoints estimation model (dummy model for faster visualization)
     pose_model = PoseModel(
-        pose_config=ctx.dummy_pose_config, pose_checkpoint=ctx.dummy_pose_checkpoint
+        pose_config=ctx.dummy_pose_config, 
+        pose_checkpoint=ctx.dummy_pose_checkpoint,
+        rgb_keypoint_vis_thres=0.3
     )  # lightweight for visualization only!
 
     # Load exo cameras
@@ -1041,8 +1043,7 @@ def mode_body_pose3d(config: Config):
                 )  ## 17 x 3
 
                 save_path = os.path.join(vis_pose3d_cam_dir, f"{time_stamp:05d}.jpg")
-                pose_model.draw_projected_poses3d([projected_pose3d], image, save_path)
-                # pose_model.draw_projected_poses3d([projected_pose3d[:21], projected_pose3d[21:]], image, save_path)
+                pose_model.draw_projected_poses3d(projected_pose3d, image, save_path)
 
     with open(os.path.join(pose3d_dir, "body_pose3d.pkl"), "wb") as f:
         pickle.dump(poses3d, f)

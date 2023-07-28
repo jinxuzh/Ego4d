@@ -7,7 +7,8 @@ from mmpose.apis import inference_topdown
 from mmpose.apis import init_model as init_pose_estimator
 from mmpose.structures import merge_data_samples, split_instances
 from mmpose.utils import adapt_mmdet_pipeline
-from mmpose.registry import VISUALIZERS
+from mmpose.visualization import FastVisualizer
+from mmengine.structures import InstanceData
 
 ##------------------------------------------------------------------------------------
 class PoseModel:
@@ -20,7 +21,7 @@ class PoseModel:
         self.pose_config = pose_config
         self.pose_checkpoint = pose_checkpoint
         self.return_heatmap = False
-
+        
         # Initialize pose model
         self.body_pose_estimator = init_pose_estimator(
             self.pose_config, self.pose_checkpoint, device="cuda:0".lower()
@@ -28,16 +29,10 @@ class PoseModel:
         self.body_pose_estimator.cfg = adapt_mmdet_pipeline(self.body_pose_estimator.cfg)
         
         # Initialize body pose visualizer
-        self.body_pose_estimator.cfg.visualizer.radius = radius
-        self.body_pose_estimator.cfg.visualizer.alpha = 1
-        self.body_pose_estimator.cfg.visualizer.line_width = thickness
-        self.body_visualizer = VISUALIZERS.build(self.body_pose_estimator.cfg.visualizer)
-        self.body_visualizer.set_dataset_meta(
-            self.body_pose_estimator.dataset_meta, skeleton_style='mmpose')
-
-        ##------hyperparameters-----
-        self.rgb_keypoint_vis_thres = rgb_keypoint_vis_thres  ## Keypoint score threshold
-
+        self.fast_visualizer = FastVisualizer(self.body_pose_estimator.dataset_meta,
+                                              radius=radius,
+                                              line_width=thickness,
+                                              kpt_thr=rgb_keypoint_vis_thres)
 
 
     ####--------------------------------------------------------
@@ -50,26 +45,23 @@ class PoseModel:
         body_kpts_conf = body_data_samples.pred_instances.keypoint_scores
         body_pose2d_result = np.append(body_kpts, body_kpts_conf[:,:,None], axis=2) # (N, 3)
 
-        return body_pose2d_result, body_data_samples
+        return body_pose2d_result
 
 
     ####--------------------------------------------------------
-    def draw_poses2d(self, body_data_samples, image, save_path):
-        body_pose_vis = self.body_visualizer.add_datasample(
-            'result',
-            image,
-            data_sample=body_data_samples,
-            draw_gt=False,
-            draw_heatmap=False,
-            draw_bbox=False,
-            show_kpt_idx=False,
-            skeleton_style='mmpose',
-            show=False,
-            wait_time=0,
-            kpt_thr=self.rgb_keypoint_vis_thres)
+    def draw_poses2d(self, body_pose2d_result, image, save_path):
+        # Create pose2d instance data
+        instanceData = InstanceData()
+        assert len(body_pose2d_result.shape) == 3 and body_pose2d_result.shape[-1] == 3, "body_pose2d_result should be (1,N,3) for one single image"
+        instanceData.keypoints = body_pose2d_result[:,:,:2]
+        instanceData.keypoint_scores = body_pose2d_result[:,:,2]
+        
+        # Draw pose2d kpts
+        vis_img = image.copy()
+        self.fast_visualizer.draw_pose(vis_img, instanceData)
         
         # Save visualization
-        cv2.imwrite(save_path, body_pose_vis)
+        cv2.imwrite(save_path, vis_img)
 
     ####--------------------------------------------------------
     def draw_projected_poses3d(self, pose_results, image_name, save_path):
@@ -101,3 +93,16 @@ class PoseModel:
             show=False,
             out_file=save_path,
         )
+    def draw_projected_poses3d(self, pose_results, image, save_path):
+        # Create pose2d instance data
+        instanceData = InstanceData()
+        assert len(pose_results.shape) == 2 and pose_results.shape[-1] == 3, "pose_results should be (N,3) for one single image"
+        instanceData.keypoints = pose_results[:,:2][None,:,:]
+        instanceData.keypoint_scores = pose_results[:,2][None,:,:]
+        
+        # Draw pose2d kpts
+        vis_img = image.copy()
+        self.fast_visualizer.draw_pose(vis_img, instanceData)
+        
+        # Save visualization
+        cv2.imwrite(save_path, vis_img)
