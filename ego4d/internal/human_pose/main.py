@@ -941,7 +941,7 @@ def mode_body_pose2d(config: Config):
                 if visualization:
                     image = cv2.imread(image_path)
                     save_path = os.path.join(vis_pose2d_cam_dir, f"{time_stamp:05d}.jpg")
-                    pose_model.draw_poses2d(body_pose2d_result, image, save_path)
+                    pose_model.draw_poses2d([body_pose2d_result], image, save_path)
                 # Append pose2d result
                 pose2d = body_pose2d_result[0] # (1,N,3) -> (N,3)
             else:
@@ -1043,7 +1043,7 @@ def mode_body_pose3d(config: Config):
                 )  ## 17 x 3
 
                 save_path = os.path.join(vis_pose3d_cam_dir, f"{time_stamp:05d}.jpg")
-                pose_model.draw_projected_poses3d(projected_pose3d, image, save_path)
+                pose_model.draw_projected_poses3d([projected_pose3d], image, save_path)
 
     with open(os.path.join(pose3d_dir, "body_pose3d.pkl"), "wb") as f:
         pickle.dump(poses3d, f)
@@ -1054,13 +1054,11 @@ def mode_wholebodyHand_pose3d(config: Config):
     Body pose3d estimation with exo cameras, but with only Wholebody-hand kpts (42 points)
     """
     ctx = get_context(config)
-    # TODO: Integrate those hardcoded values into args
+    # TODO: Integrate those hardcoded values into args 
     ##################################
-    exo_cam_names = (
-        ctx.exo_cam_names
-    )  # Select all default cameras: ctx.exo_cam_names or manual seelction: ['cam01','cam02']
-    tri_threshold = 0.5  # This determines the wholebody-Hand kpts confidence threshold to perform triangulation
-    visualization = True  # Whether show visualization
+    exo_cam_names = ctx.exo_cam_names # Select all default cameras: ctx.exo_cam_names or manual seelction: ['cam01','cam02']
+    tri_threshold = 0.3               # This determines the wholebody-Hand kpts confidence threshold to perform triangulation
+    visualization = True              # Whether show visualization
     ##################################
 
     # Load dataset info
@@ -1071,13 +1069,11 @@ def mode_wholebodyHand_pose3d(config: Config):
     )
     # Load hand keypoints estimation model (dummy model for faster visualization)
     pose_model = PoseModel(
-        pose_config=ctx.hand_pose_config,
-        pose_checkpoint=ctx.hand_pose_ckpt,
-        rgb_keypoint_thres=tri_threshold,
-        rgb_keypoint_vis_thres=tri_threshold,
-    )
-
-    # Load exo cameras
+        pose_config=ctx.hand_pose_config, 
+        pose_checkpoint=ctx.hand_pose_ckpt, 
+        rgb_keypoint_vis_thres=tri_threshold)
+    
+    # Load exo cameras 
     exo_cameras = {
         exo_camera_name: create_camera(
             dset[0][f"{exo_camera_name}_0"]["camera_data"], None
@@ -1204,12 +1200,9 @@ def mode_exo_hand_pose2d(config: Config):
     )
     # Hand pose estimation model
     hand_pose_model = PoseModel(
-        pose_config=ctx.hand_pose_config,
-        pose_checkpoint=ctx.hand_pose_ckpt,
-        rgb_keypoint_thres=kpts_vis_threshold,
-        rgb_keypoint_vis_thres=kpts_vis_threshold,
-        refine_bbox=False,
-    )
+        pose_config=ctx.hand_pose_config, 
+        pose_checkpoint=ctx.hand_pose_ckpt, 
+        rgb_keypoint_vis_thres=kpts_vis_threshold)
 
     # Directory to store bbox and pose2d kpts
     bbox_dir = os.path.join(ctx.dataset_dir, f"hand/bbox")
@@ -1309,7 +1302,12 @@ def mode_exo_hand_pose2d(config: Config):
                 bboxes=two_hand_bboxes,
                 image_name=image_path,
             )
-
+            
+            # hand_pose2d_result = hand_pose_model.get_poses2d(
+            #     bboxes=bbox_xyxy,
+            #     image_name=image_path,
+            # )
+            
             # Save 2d hand pose estimation result ~ (2,21,3)
             curr_pose2d_kpts = np.array([res["keypoints"] for res in pose_results])
             poses2d[time_stamp][exo_camera_name] = curr_pose2d_kpts

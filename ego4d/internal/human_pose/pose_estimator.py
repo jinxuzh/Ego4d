@@ -16,7 +16,7 @@ class PoseModel:
                  pose_config=None, 
                  pose_checkpoint=None, 
                  rgb_keypoint_vis_thres=0.7,  
-                 radius=4,
+                 radius=3,
                  thickness=4):
         self.pose_config = pose_config
         self.pose_checkpoint = pose_checkpoint
@@ -50,18 +50,19 @@ class PoseModel:
 
     ####--------------------------------------------------------
     def draw_poses2d(self, body_pose2d_result, image, save_path):
-        # Create pose2d instance data
-        instanceData = InstanceData()
-        assert len(body_pose2d_result.shape) == 3 and body_pose2d_result.shape[-1] == 3, "body_pose2d_result should be (1,N,3) for one single image"
-        instanceData.keypoints = body_pose2d_result[:,:,:2]
-        instanceData.keypoint_scores = body_pose2d_result[:,:,2]
-        
-        # Draw pose2d kpts
         vis_img = image.copy()
-        self.fast_visualizer.draw_pose(vis_img, instanceData)
-        
-        # Save visualization
-        cv2.imwrite(save_path, vis_img)
+        for curr_pose2d_res in body_pose2d_result:
+            # Create pose2d instance data
+            instanceData = InstanceData()
+            assert len(curr_pose2d_res.shape) == 3 and curr_pose2d_res.shape[-1] == 3, "body_pose2d_result should be (1,N,3) for one single image"
+            instanceData.keypoints = curr_pose2d_res[:,:,:2]
+            instanceData.keypoint_scores = curr_pose2d_res[:,:,2]
+                
+            # Draw pose2d kpts
+            self.fast_visualizer.draw_pose(vis_img, instanceData)
+            
+            # Save visualization
+            cv2.imwrite(save_path, vis_img)
 
     ####--------------------------------------------------------
     def draw_projected_poses3d(self, pose_results, image_name, save_path):
@@ -94,15 +95,16 @@ class PoseModel:
             out_file=save_path,
         )
     def draw_projected_poses3d(self, pose_results, image, save_path):
-        # Create pose2d instance data
-        instanceData = InstanceData()
-        assert len(pose_results.shape) == 2 and pose_results.shape[-1] == 3, "pose_results should be (N,3) for one single image"
-        instanceData.keypoints = pose_results[:,:2][None,:,:]
-        instanceData.keypoint_scores = pose_results[:,2][None,:,:]
-        
-        # Draw pose2d kpts
         vis_img = image.copy()
-        self.fast_visualizer.draw_pose(vis_img, instanceData)
-        
-        # Save visualization
-        cv2.imwrite(save_path, vis_img)
+        for curr_pose2d_res in pose_results:
+            # Create pose2d instance data
+            instanceData = InstanceData()
+            assert len(curr_pose2d_res.shape) == 2 and curr_pose2d_res.shape[-1] == 3, "pose_results should be (N,3) for one single image"
+            instanceData.keypoints = curr_pose2d_res[:,:2][None,:]
+            instanceData.keypoint_scores = curr_pose2d_res[:,2][None,:]
+            
+            # Draw pose2d kpts
+            self.fast_visualizer.draw_pose(vis_img, instanceData)
+            
+            # Save visualization
+            cv2.imwrite(save_path, vis_img)
