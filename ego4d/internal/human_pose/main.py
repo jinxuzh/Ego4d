@@ -1501,9 +1501,7 @@ def mode_exo_hand_pose3d(config: Config):
     hand_pose_model = PoseModel(
         pose_config=ctx.hand_pose_config,
         pose_checkpoint=ctx.hand_pose_ckpt,
-        rgb_keypoint_thres=tri_threshold,
         rgb_keypoint_vis_thres=tri_threshold,
-        refine_bbox=False,
     )
 
     # Create both aria and exo camera
