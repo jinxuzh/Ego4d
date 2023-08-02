@@ -15,7 +15,7 @@ class PoseModel:
     def __init__(self, 
                  pose_config=None, 
                  pose_checkpoint=None, 
-                 rgb_keypoint_vis_thres=0.7,  
+                 rgb_keypoint_vis_thres=0.3,  
                  radius=3,
                  thickness=4):
         self.pose_config = pose_config
@@ -23,13 +23,13 @@ class PoseModel:
         self.return_heatmap = False
         
         # Initialize pose model
-        self.body_pose_estimator = init_pose_estimator(
+        self.pose_estimator = init_pose_estimator(
             self.pose_config, self.pose_checkpoint, device="cuda:0".lower()
         )
-        self.body_pose_estimator.cfg = adapt_mmdet_pipeline(self.body_pose_estimator.cfg)
+        self.pose_estimator.cfg = adapt_mmdet_pipeline(self.pose_estimator.cfg)
         
         # Initialize body pose visualizer
-        self.fast_visualizer = FastVisualizer(self.body_pose_estimator.dataset_meta,
+        self.fast_visualizer = FastVisualizer(self.pose_estimator.dataset_meta,
                                               radius=radius,
                                               line_width=thickness,
                                               kpt_thr=rgb_keypoint_vis_thres)
@@ -37,21 +37,21 @@ class PoseModel:
 
     ####--------------------------------------------------------
     def get_poses2d(self, bboxes, image_name):
-        body_pose_results = inference_topdown(self.body_pose_estimator, image_name, bboxes)
-        body_data_samples = merge_data_samples(body_pose_results)
+        pose_results = inference_topdown(self.pose_estimator, image_name, bboxes)
+        data_samples = merge_data_samples(pose_results)
 
-        # Body pose2d kpts
-        body_kpts = body_data_samples.pred_instances.keypoints
-        body_kpts_conf = body_data_samples.pred_instances.keypoint_scores
-        body_pose2d_result = np.append(body_kpts, body_kpts_conf[:,:,None], axis=2) # (N, 3)
+        # Pose2d kpts
+        kpts = data_samples.pred_instances.keypoints
+        kpts_conf = data_samples.pred_instances.keypoint_scores
+        pose2d_result = np.append(kpts, kpts_conf[:,:,None], axis=2) # (N, 3)
 
-        return body_pose2d_result
+        return pose2d_result
 
 
     ####--------------------------------------------------------
-    def draw_poses2d(self, body_pose2d_result, image, save_path):
+    def draw_poses2d(self, pose2d_result, image, save_path):
         vis_img = image.copy()
-        for curr_pose2d_res in body_pose2d_result:
+        for curr_pose2d_res in pose2d_result:
             # Create pose2d instance data
             instanceData = InstanceData()
             assert len(curr_pose2d_res.shape) == 3 and curr_pose2d_res.shape[-1] == 3, "body_pose2d_result should be (1,N,3) for one single image"

@@ -1293,36 +1293,21 @@ def mode_exo_hand_pose2d(config: Config):
                 )
 
             ############## Hand pose 2d ##############
-            # Append confience score to bbox
-            bbox_xyxy_right = np.append(right_hand_bbox, 1)
-            bbox_xyxy_left = np.append(left_hand_bbox, 1)
-            two_hand_bboxes = [{"bbox": bbox_xyxy_right}, {"bbox": bbox_xyxy_left}]
             # Hand pose estimation
+            two_hand_bboxes = np.array([right_hand_bbox, left_hand_bbox])
             pose_results = hand_pose_model.get_poses2d(
                 bboxes=two_hand_bboxes,
                 image_name=image_path,
             )
             
-            # hand_pose2d_result = hand_pose_model.get_poses2d(
-            #     bboxes=bbox_xyxy,
-            #     image_name=image_path,
-            # )
-            
             # Save 2d hand pose estimation result ~ (2,21,3)
-            curr_pose2d_kpts = np.array([res["keypoints"] for res in pose_results])
-            poses2d[time_stamp][exo_camera_name] = curr_pose2d_kpts
-
+            poses2d[time_stamp][exo_camera_name] = pose_results # (2, 21, 3): Assume only one pair of hands
+            
             # Visualization
             if visualization:
                 save_path = os.path.join(vis_pose2d_cam_dir, f"{time_stamp:05d}.jpg")
                 vis_pose2d_img = image.copy()
-                hand_pose_model.draw_poses2d(
-                    [pose_results[0]], vis_pose2d_img, save_path
-                )
-                vis_pose2d_img = cv2.imread(save_path)
-                hand_pose_model.draw_poses2d(
-                    [pose_results[1]], vis_pose2d_img, save_path
-                )
+                hand_pose_model.draw_poses2d([pose_results], vis_pose2d_img, save_path)
 
     # save poses2d key points result
     with open(os.path.join(pose2d_dir, "exo_pose2d.pkl"), "wb") as f:
@@ -1340,9 +1325,9 @@ def mode_ego_hand_pose2d(config: Config):
     ctx = get_context(config)
     # TODO: Integrate those hardcoded values into args
     ################# Modified as needed #####################
-    ego_cam_name = "aria01_rgb"
-    kpts_vis_threshold = 0.3  # This value determines the threshold to visualize hand pose2d estimated kpts
-    tri_threshold = 0.5  # This value determines which wholebody-Hand pose3d kpts to use
+    ego_cam_name = 'aria01_rgb'
+    kpts_vis_threshold = 0.3    # This value determines the threshold to visualize hand pose2d estimated kpts
+    tri_threshold = 0.3         # This value determines which wholebody-Hand pose3d kpts to use
     visualization = True
     ##########################################################
 
@@ -1355,12 +1340,9 @@ def mode_ego_hand_pose2d(config: Config):
 
     # Hand pose estimation model
     hand_pose_model = PoseModel(
-        pose_config=ctx.hand_pose_config,
-        pose_checkpoint=ctx.hand_pose_ckpt,
-        rgb_keypoint_thres=kpts_vis_threshold,
-        rgb_keypoint_vis_thres=kpts_vis_threshold,
-        refine_bbox=False,
-    )
+        pose_config=ctx.hand_pose_config, 
+        pose_checkpoint=ctx.hand_pose_ckpt, 
+        rgb_keypoint_vis_thres=kpts_vis_threshold)
 
     # Directory to store bbox result and visualization
     bbox_dir = os.path.join(ctx.dataset_dir, f"hand/bbox")
@@ -1474,26 +1456,20 @@ def mode_ego_hand_pose2d(config: Config):
 
         ######################### Hand pose2d estimation on ego camera (aria) ##################################
         # Format hand bbox
-        two_hand_bboxes = [
-            {"bbox": np.append(curr_hand_bbox, 1)}
-            for curr_hand_bbox in [right_hand_bbox, left_hand_bbox]
-        ]
+        two_hand_bboxes = np.array([right_hand_bbox, left_hand_bbox])
         # Hand pose estimation
         pose_results = hand_pose_model.get_poses2d(
-            bboxes=two_hand_bboxes,
-            image_name=image_path,
-        )
+                bboxes=two_hand_bboxes,
+                image_name=image_path,
+            )
         # Save result
-        curr_pose2d_kpts = np.array([res["keypoints"] for res in pose_results])
-        poses2d[time_stamp] = curr_pose2d_kpts
+        poses2d[time_stamp] = pose_results
         # Visualization
         if visualization:
             save_path = os.path.join(vis_pose2d_dir, f"{time_stamp:06d}.jpg")
             vis_twoHand = cv2.imread(image_path)
-            hand_pose_model.draw_poses2d([pose_results[0]], vis_twoHand, save_path)
-            vis_twoHand = cv2.imread(save_path)
-            hand_pose_model.draw_poses2d([pose_results[1]], vis_twoHand, save_path)
-
+            hand_pose_model.draw_poses2d([pose_results], vis_twoHand, save_path)
+    
     # save poses2d key points result
     with open(os.path.join(pose2d_dir, "ego_pose2d.pkl"), "wb") as f:
         pickle.dump(poses2d, f)
