@@ -64,36 +64,7 @@ class PoseModel:
             # Save visualization
             cv2.imwrite(save_path, vis_img)
 
-    ####--------------------------------------------------------
-    def draw_projected_poses3d(self, pose_results, image_name, save_path):
-        keypoint_thres = self.rgb_keypoint_vis_thres
 
-        ##-----------restructure to the desired format used by mmpose---------
-        pose_results_ = []
-        for pose in pose_results:
-            pose_ = np.zeros(
-                (self.num_keypoints, 3)
-            )  ## N x 3 (17 for body; 21 for hand)
-
-            pose_[: len(pose), :3] = pose[:, :]
-
-            pose_result = {"keypoints": pose_}
-            pose_results_.append(pose_result)
-
-        pose_results = pose_results_
-
-        vis_pose_result(
-            self.pose_model,
-            image_name,
-            pose_results,
-            dataset=self.dataset,
-            dataset_info=self.dataset_info,
-            kpt_score_thr=keypoint_thres,
-            radius=self.radius,
-            thickness=self.thickness,
-            show=False,
-            out_file=save_path,
-        )
     def draw_projected_poses3d(self, pose_results, image, save_path):
         vis_img = image.copy()
         for curr_pose2d_res in pose_results:
