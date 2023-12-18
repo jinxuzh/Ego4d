@@ -184,7 +184,7 @@ def run_task(task):
     task.create_job_list(args)
     create_work_dir_list(args)
 
-    print("Args: {}".format(args))
+    # print("Args: {}".format(args))
 
     for job_id in range(args.job_num):
         task.config_single_job(args, job_id)
